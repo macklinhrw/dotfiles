@@ -1,0 +1,11 @@
+font:
+  normal:
+    family: MesloLGMDZ NF
+    style: Regular
+  size: 12.0
+window:
+  decorations: none
+  opacity: 0.85
+  padding:
+    x: 3
+    y: 3
