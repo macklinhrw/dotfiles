@@ -1,0 +1,1 @@
+herbstclient load '(split vertical:0.7757:0 (clients vertical:0 0x2200002) (split horizontal:0.5889:0 (clients vertical:0 0x2600002) (clients vertical:0 0x2a00002)))'
