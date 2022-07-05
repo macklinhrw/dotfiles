@@ -1,0 +1,13 @@
+/** Basic config file **/
+
+
+configuration {
+  show-icons: true;
+  icon-theme: "Papirus";
+  display-drun: "";
+  display-window: "﩯 ";
+  display-combi: "  ";
+  terminal: "/usr/bin/kitty";
+}
+@theme "themes/sidetab-nord.rasi"
+
