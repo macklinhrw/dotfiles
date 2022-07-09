@@ -13,6 +13,9 @@ print_tags() {
 		'+')
 			printf '%%{F#cccccc}%%{R} %s %%{R}%%{F-}' "%{A1:herbstclient use $name:}$name%{A}"
 			;;
+		'-')
+			printf ' %s ' "%{A1:herbstclient use $name:}-$name%{A}"
+			;;
 		'!')
 			printf '%%{R} %s! %%{R}' "%{A1:herbstclient use $name:}$name%{A}"
 			;;
