@@ -1,0 +1,235 @@
+#!/bin/bash
+
+set -e
+
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+RED='\033[0;31m'
+NC='\033[0m' # No Color
+
+log() {
+    echo -e "${GREEN}[INFO]${NC} $1"
+}
+
+warn() {
+    echo -e "${YELLOW}[WARN]${NC} $1"
+}
+
+error() {
+    echo -e "${RED}[ERROR]${NC} $1"
+}
+
+check_command() {
+    if ! command -v "$1" &> /dev/null; then
+        error "$1 is not installed. Please install it first."
+        exit 1
+    fi
+}
+
+install_jump() {
+    log "Installing jump directory navigator..."
+    
+    # Check if jump is already installed
+    if command -v jump &> /dev/null; then
+        warn "Jump is already installed, skipping..."
+        return 0
+    fi
+    
+    # Install jump using Go
+    if command -v go &> /dev/null; then
+        log "Installing jump using Go..."
+        go install github.com/gsamokovarov/jump@latest
+        
+        # Add jump to shell configuration
+        SHELL_CONFIG=""
+        if [[ "$SHELL" == *"zsh"* ]]; then
+            SHELL_CONFIG="$HOME/.zshrc"
+        elif [[ "$SHELL" == *"bash"* ]]; then
+            SHELL_CONFIG="$HOME/.bashrc"
+        fi
+        
+        if [[ -n "$SHELL_CONFIG" ]]; then
+            if ! grep -q "jump shell" "$SHELL_CONFIG"; then
+                echo "" >> "$SHELL_CONFIG"
+                echo "# Jump directory navigator" >> "$SHELL_CONFIG"
+                echo 'eval "$(jump shell)"' >> "$SHELL_CONFIG"
+                log "Added jump configuration to $SHELL_CONFIG"
+            fi
+        fi
+    else
+        error "Go is not installed. Please install Go first to install jump."
+        exit 1
+    fi
+}
+
+install_astrovim() {
+    log "Installing AstroVim..."
+    
+    # Check if neovim is installed
+    check_command nvim
+    
+    # Check if AstroVim is already installed
+    if [[ -d "$HOME/.config/nvim" ]]; then
+        warn "Neovim configuration already exists. Backing up..."
+        mv "$HOME/.config/nvim" "$HOME/.config/nvim.bak.$(date +%Y%m%d_%H%M%S)"
+    fi
+    
+    # Backup other nvim directories if they exist
+    [[ -d "$HOME/.local/share/nvim" ]] && mv "$HOME/.local/share/nvim" "$HOME/.local/share/nvim.bak.$(date +%Y%m%d_%H%M%S)"
+    [[ -d "$HOME/.local/state/nvim" ]] && mv "$HOME/.local/state/nvim" "$HOME/.local/state/nvim.bak.$(date +%Y%m%d_%H%M%S)"
+    [[ -d "$HOME/.cache/nvim" ]] && mv "$HOME/.cache/nvim" "$HOME/.cache/nvim.bak.$(date +%Y%m%d_%H%M%S)"
+    
+    # Clone AstroVim template
+    log "Cloning AstroVim template..."
+    git clone --depth 1 https://github.com/AstroNvim/template "$HOME/.config/nvim"
+    rm -rf "$HOME/.config/nvim/.git"
+    
+    log "AstroVim installed successfully!"
+    log "Run 'nvim' to complete the installation."
+}
+
+set_zsh_as_default() {
+    log "Setting zsh as default shell..."
+    
+    # Check if zsh is installed
+    check_command zsh
+    
+    # Check if zsh is already the default shell
+    if [[ "$SHELL" == *"zsh"* ]]; then
+        log "Zsh is already the default shell"
+        return 0
+    fi
+    
+    # Change default shell to zsh
+    log "Changing default shell to zsh..."
+    chsh -s "$(which zsh)"
+    
+    log "Default shell changed to zsh. Please log out and log back in for the change to take effect."
+}
+
+install_powerlevel10k() {
+    log "Installing Powerlevel10k..."
+    
+    # Check if zsh is installed
+    check_command zsh
+    
+    # Check if Oh My Zsh is installed
+    if [[ ! -d "$HOME/.oh-my-zsh" ]]; then
+        log "Oh My Zsh not found. Installing Oh My Zsh first..."
+        sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)" "" --unattended
+    fi
+    
+    # Check if Powerlevel10k is already installed
+    if [[ -d "${ZSH_CUSTOM:-$HOME/.oh-my-zsh/custom}/themes/powerlevel10k" ]]; then
+        warn "Powerlevel10k is already installed, skipping..."
+        return 0
+    fi
+    
+    # Clone Powerlevel10k repository
+    log "Cloning Powerlevel10k repository..."
+    git clone --depth=1 https://github.com/romkatv/powerlevel10k.git "${ZSH_CUSTOM:-$HOME/.oh-my-zsh/custom}/themes/powerlevel10k"
+    
+    # Update .zshrc to use Powerlevel10k theme
+    if [[ -f "$HOME/.zshrc" ]]; then
+        log "Updating .zshrc to use Powerlevel10k theme..."
+        sed -i 's/ZSH_THEME=".*"/ZSH_THEME="powerlevel10k\/powerlevel10k"/' "$HOME/.zshrc"
+    fi
+    
+    # Copy custom Powerlevel10k configuration
+    SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    if [[ -f "$SCRIPT_DIR/.p10k.zsh" ]]; then
+        log "Copying custom Powerlevel10k configuration..."
+        cp "$SCRIPT_DIR/.p10k.zsh" "$HOME/.p10k.zsh"
+        
+        # Add p10k config source to .zshrc if not already there
+        if [[ -f "$HOME/.zshrc" ]] && ! grep -q "source ~/.p10k.zsh" "$HOME/.zshrc"; then
+            echo "" >> "$HOME/.zshrc"
+            echo "# To customize prompt, run \`p10k configure\` or edit ~/.p10k.zsh." >> "$HOME/.zshrc"
+            echo "[[ ! -f ~/.p10k.zsh ]] || source ~/.p10k.zsh" >> "$HOME/.zshrc"
+        fi
+    fi
+    
+    log "Powerlevel10k installed successfully!"
+    log "Your custom configuration has been applied."
+}
+
+install_claude_code() {
+    log "Installing Claude Code..."
+    
+    # Check if node and npm are installed
+    check_command node
+    check_command npm
+    
+    # Check Node.js version
+    NODE_VERSION=$(node --version | cut -d'v' -f2)
+    REQUIRED_VERSION="18.0.0"
+    
+    if ! printf '%s\n%s\n' "$REQUIRED_VERSION" "$NODE_VERSION" | sort -V -C; then
+        error "Node.js version $NODE_VERSION is too old. Please install Node.js 18 or higher."
+        exit 1
+    fi
+    
+    # Check if claude code is already installed
+    if command -v claude &> /dev/null; then
+        warn "Claude Code is already installed, skipping..."
+        return 0
+    fi
+    
+    # Set up npm global directory to avoid permission issues
+    if [[ ! -d "$HOME/.npm-global" ]]; then
+        log "Setting up npm global directory..."
+        mkdir -p "$HOME/.npm-global"
+        npm config set prefix "$HOME/.npm-global"
+        
+        # Add to PATH if not already there
+        SHELL_CONFIG=""
+        if [[ "$SHELL" == *"zsh"* ]]; then
+            SHELL_CONFIG="$HOME/.zshrc"
+        elif [[ "$SHELL" == *"bash"* ]]; then
+            SHELL_CONFIG="$HOME/.bashrc"
+        fi
+        
+        if [[ -n "$SHELL_CONFIG" ]]; then
+            if ! grep -q ".npm-global/bin" "$SHELL_CONFIG"; then
+                echo "" >> "$SHELL_CONFIG"
+                echo "# Add npm global bin to PATH" >> "$SHELL_CONFIG"
+                echo 'export PATH="$HOME/.npm-global/bin:$PATH"' >> "$SHELL_CONFIG"
+                log "Added npm global bin to PATH in $SHELL_CONFIG"
+            fi
+        fi
+        
+        # Export for current session
+        export PATH="$HOME/.npm-global/bin:$PATH"
+    fi
+    
+    # Install Claude Code
+    log "Installing Claude Code via npm..."
+    npm install -g @anthropic-ai/claude-code
+    
+    log "Claude Code installed successfully!"
+    log "Run 'claude' to start using Claude Code."
+}
+
+main() {
+    log "Starting dotfiles installation..."
+    
+    # Set zsh as default shell
+    set_zsh_as_default
+    
+    # Install jump
+    install_jump
+    
+    # Install AstroVim
+    install_astrovim
+    
+    # Install Powerlevel10k
+    install_powerlevel10k
+    
+    # Install Claude Code
+    install_claude_code
+    
+    log "Installation complete!"
+    log "Please restart your shell or run 'source ~/.bashrc' (or ~/.zshrc) to reload your configuration."
+}
+
+main "$@"
