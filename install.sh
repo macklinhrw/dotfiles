@@ -146,6 +146,22 @@ install_jump() {
         return 0
     fi
     
+    # Ensure Go is in PATH and GOPATH is set
+    if [[ -f "/usr/local/go/bin/go" ]]; then
+        export PATH=$PATH:/usr/local/go/bin
+        export GOPATH=$HOME/go
+        export PATH=$PATH:$GOPATH/bin
+    fi
+    
+    # Check if Go is available
+    if ! command -v go &> /dev/null; then
+        error "Go is not available. Please install Go first."
+        exit 1
+    fi
+    
+    # Create GOPATH directory if it doesn't exist
+    mkdir -p "$GOPATH/bin"
+    
     # Install jump using Go
     log "Installing jump using Go..."
     go install github.com/gsamokovarov/jump@latest
