@@ -143,28 +143,41 @@ install_jump() {
 install_neovim_nightly() {
     log "Installing Neovim nightly..."
     
+    # Check if Neovim is already installed
+    if command -v nvim &> /dev/null; then
+        NVIM_VERSION=$(nvim --version | head -1)
+        log "Neovim is already installed: $NVIM_VERSION"
+        return 0
+    fi
+    
     # Determine architecture
     ARCH=$(uname -m)
     case $ARCH in
-        x86_64) ARCH="linux64" ;;
-        aarch64) ARCH="linux64" ;;
+        x86_64) NVIM_ARCH="linux64" ;;
+        aarch64) NVIM_ARCH="linux64" ;;
         *) error "Unsupported architecture: $ARCH"; exit 1 ;;
     esac
     
     # Download latest nightly build
-    NVIM_URL="https://github.com/neovim/neovim/releases/download/nightly/nvim-${ARCH}.tar.gz"
-    INSTALL_DIR="/opt/nvim-linux-x86_64"
+    NVIM_URL="https://github.com/neovim/neovim/releases/download/nightly/nvim-${NVIM_ARCH}.tar.gz"
+    INSTALL_DIR="/opt/nvim"
     
     log "Downloading Neovim nightly build..."
     cd /tmp
     curl -LO "$NVIM_URL"
+    
+    # Check if download was successful
+    if [[ ! -f "nvim-${NVIM_ARCH}.tar.gz" ]]; then
+        error "Failed to download Neovim nightly build"
+        exit 1
+    fi
     
     # Remove existing installation if it exists
     sudo rm -rf "$INSTALL_DIR"
     
     # Extract and install
     sudo mkdir -p "$INSTALL_DIR"
-    sudo tar -C "$INSTALL_DIR" --strip-components=1 -xzf "nvim-${ARCH}.tar.gz"
+    sudo tar -C "$INSTALL_DIR" --strip-components=1 -xzf "nvim-${NVIM_ARCH}.tar.gz"
     
     # Create symlink in /usr/local/bin
     sudo ln -sf "$INSTALL_DIR/bin/nvim" /usr/local/bin/nvim
@@ -190,7 +203,7 @@ install_neovim_nightly() {
     export PATH="$INSTALL_DIR/bin:$PATH"
     
     # Clean up
-    rm -f "/tmp/nvim-${ARCH}.tar.gz"
+    rm -f "/tmp/nvim-${NVIM_ARCH}.tar.gz"
     
     log "Neovim nightly installed successfully!"
     log "Neovim version: $(nvim --version | head -1)"
