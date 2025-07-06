@@ -140,6 +140,62 @@ install_jump() {
     fi
 }
 
+install_neovim_nightly() {
+    log "Installing Neovim nightly..."
+    
+    # Determine architecture
+    ARCH=$(uname -m)
+    case $ARCH in
+        x86_64) ARCH="linux64" ;;
+        aarch64) ARCH="linux64" ;;
+        *) error "Unsupported architecture: $ARCH"; exit 1 ;;
+    esac
+    
+    # Download latest nightly build
+    NVIM_URL="https://github.com/neovim/neovim/releases/download/nightly/nvim-${ARCH}.tar.gz"
+    INSTALL_DIR="/opt/nvim-linux-x86_64"
+    
+    log "Downloading Neovim nightly build..."
+    cd /tmp
+    curl -LO "$NVIM_URL"
+    
+    # Remove existing installation if it exists
+    sudo rm -rf "$INSTALL_DIR"
+    
+    # Extract and install
+    sudo mkdir -p "$INSTALL_DIR"
+    sudo tar -C "$INSTALL_DIR" --strip-components=1 -xzf "nvim-${ARCH}.tar.gz"
+    
+    # Create symlink in /usr/local/bin
+    sudo ln -sf "$INSTALL_DIR/bin/nvim" /usr/local/bin/nvim
+    
+    # Add to PATH if not already there
+    SHELL_CONFIG=""
+    if [[ "$SHELL" == *"zsh"* ]]; then
+        SHELL_CONFIG="$HOME/.zshrc"
+    elif [[ "$SHELL" == *"bash"* ]]; then
+        SHELL_CONFIG="$HOME/.bashrc"
+    fi
+    
+    if [[ -n "$SHELL_CONFIG" ]]; then
+        if ! grep -q "$INSTALL_DIR/bin" "$SHELL_CONFIG"; then
+            echo "" >> "$SHELL_CONFIG"
+            echo "# Neovim nightly" >> "$SHELL_CONFIG"
+            echo "export PATH=\"$INSTALL_DIR/bin:\$PATH\"" >> "$SHELL_CONFIG"
+            log "Added Neovim to PATH in $SHELL_CONFIG"
+        fi
+    fi
+    
+    # Export for current session
+    export PATH="$INSTALL_DIR/bin:$PATH"
+    
+    # Clean up
+    rm -f "/tmp/nvim-${ARCH}.tar.gz"
+    
+    log "Neovim nightly installed successfully!"
+    log "Neovim version: $(nvim --version | head -1)"
+}
+
 install_astrovim() {
     log "Installing AstroVim..."
     
@@ -302,6 +358,9 @@ main() {
     
     # Install jump
     install_jump
+    
+    # Install Neovim nightly
+    install_neovim_nightly
     
     # Install AstroVim
     install_astrovim
