@@ -26,6 +26,89 @@ check_command() {
     fi
 }
 
+install_go() {
+    log "Installing Go..."
+    
+    # Check if Go is already installed
+    if command -v go &> /dev/null; then
+        GO_VERSION=$(go version | awk '{print $3}' | sed 's/go//')
+        log "Go $GO_VERSION is already installed"
+        return 0
+    fi
+    
+    # Determine architecture
+    ARCH=$(uname -m)
+    case $ARCH in
+        x86_64) ARCH="amd64" ;;
+        aarch64) ARCH="arm64" ;;
+        *) error "Unsupported architecture: $ARCH"; exit 1 ;;
+    esac
+    
+    # Download and install Go
+    GO_VERSION="1.21.5"
+    GO_TARBALL="go${GO_VERSION}.linux-${ARCH}.tar.gz"
+    
+    log "Downloading Go $GO_VERSION for $ARCH..."
+    cd /tmp
+    curl -LO "https://go.dev/dl/$GO_TARBALL"
+    
+    # Remove existing Go installation if it exists
+    sudo rm -rf /usr/local/go
+    
+    # Extract and install Go
+    sudo tar -C /usr/local -xzf "$GO_TARBALL"
+    
+    # Add Go to PATH
+    SHELL_CONFIG=""
+    if [[ "$SHELL" == *"zsh"* ]]; then
+        SHELL_CONFIG="$HOME/.zshrc"
+    elif [[ "$SHELL" == *"bash"* ]]; then
+        SHELL_CONFIG="$HOME/.bashrc"
+    fi
+    
+    if [[ -n "$SHELL_CONFIG" ]]; then
+        if ! grep -q "/usr/local/go/bin" "$SHELL_CONFIG"; then
+            echo "" >> "$SHELL_CONFIG"
+            echo "# Go installation" >> "$SHELL_CONFIG"
+            echo 'export PATH=$PATH:/usr/local/go/bin' >> "$SHELL_CONFIG"
+            echo 'export GOPATH=$HOME/go' >> "$SHELL_CONFIG"
+            echo 'export PATH=$PATH:$GOPATH/bin' >> "$SHELL_CONFIG"
+            log "Added Go to PATH in $SHELL_CONFIG"
+        fi
+    fi
+    
+    # Export for current session
+    export PATH=$PATH:/usr/local/go/bin
+    export GOPATH=$HOME/go
+    export PATH=$PATH:$GOPATH/bin
+    
+    # Clean up
+    rm -f "/tmp/$GO_TARBALL"
+    
+    log "Go installed successfully!"
+    log "Go version: $(go version)"
+}
+
+setup_aliases() {
+    log "Setting up shell aliases..."
+    
+    SHELL_CONFIG=""
+    if [[ "$SHELL" == *"zsh"* ]]; then
+        SHELL_CONFIG="$HOME/.zshrc"
+    elif [[ "$SHELL" == *"bash"* ]]; then
+        SHELL_CONFIG="$HOME/.bashrc"
+    fi
+    
+    if [[ -n "$SHELL_CONFIG" ]]; then
+        if ! grep -q "alias ll=" "$SHELL_CONFIG"; then
+            echo "" >> "$SHELL_CONFIG"
+            echo "# Custom aliases" >> "$SHELL_CONFIG"
+            echo "alias ll='ls -la'" >> "$SHELL_CONFIG"
+            log "Added ll alias to $SHELL_CONFIG"
+        fi
+    fi
+}
+
 install_jump() {
     log "Installing jump directory navigator..."
     
@@ -36,29 +119,24 @@ install_jump() {
     fi
     
     # Install jump using Go
-    if command -v go &> /dev/null; then
-        log "Installing jump using Go..."
-        go install github.com/gsamokovarov/jump@latest
-        
-        # Add jump to shell configuration
-        SHELL_CONFIG=""
-        if [[ "$SHELL" == *"zsh"* ]]; then
-            SHELL_CONFIG="$HOME/.zshrc"
-        elif [[ "$SHELL" == *"bash"* ]]; then
-            SHELL_CONFIG="$HOME/.bashrc"
+    log "Installing jump using Go..."
+    go install github.com/gsamokovarov/jump@latest
+    
+    # Add jump to shell configuration
+    SHELL_CONFIG=""
+    if [[ "$SHELL" == *"zsh"* ]]; then
+        SHELL_CONFIG="$HOME/.zshrc"
+    elif [[ "$SHELL" == *"bash"* ]]; then
+        SHELL_CONFIG="$HOME/.bashrc"
+    fi
+    
+    if [[ -n "$SHELL_CONFIG" ]]; then
+        if ! grep -q "jump shell" "$SHELL_CONFIG"; then
+            echo "" >> "$SHELL_CONFIG"
+            echo "# Jump directory navigator" >> "$SHELL_CONFIG"
+            echo 'eval "$(jump shell)"' >> "$SHELL_CONFIG"
+            log "Added jump configuration to $SHELL_CONFIG"
         fi
-        
-        if [[ -n "$SHELL_CONFIG" ]]; then
-            if ! grep -q "jump shell" "$SHELL_CONFIG"; then
-                echo "" >> "$SHELL_CONFIG"
-                echo "# Jump directory navigator" >> "$SHELL_CONFIG"
-                echo 'eval "$(jump shell)"' >> "$SHELL_CONFIG"
-                log "Added jump configuration to $SHELL_CONFIG"
-            fi
-        fi
-    else
-        error "Go is not installed. Please install Go first to install jump."
-        exit 1
     fi
 }
 
@@ -215,6 +293,12 @@ main() {
     
     # Set zsh as default shell
     set_zsh_as_default
+    
+    # Install Go
+    install_go
+    
+    # Setup shell aliases
+    setup_aliases
     
     # Install jump
     install_jump
