@@ -261,8 +261,14 @@ install_astrovim() {
     
     # Check if AstroVim is already installed
     if [[ -d "$HOME/.config/nvim" ]]; then
-        warn "Neovim configuration already exists. Backing up..."
-        mv "$HOME/.config/nvim" "$HOME/.config/nvim.bak.$(date +%Y%m%d_%H%M%S)"
+        # Check if it's actually AstroVim by looking for characteristic files
+        if [[ -f "$HOME/.config/nvim/lua/astronvim/bootstrap.lua" ]] || [[ -f "$HOME/.config/nvim/init.lua" ]]; then
+            warn "AstroVim is already installed, skipping..."
+            return 0
+        else
+            warn "Neovim configuration already exists. Backing up..."
+            mv "$HOME/.config/nvim" "$HOME/.config/nvim.bak.$(date +%Y%m%d_%H%M%S)"
+        fi
     fi
     
     # Backup other nvim directories if they exist
@@ -342,6 +348,34 @@ install_powerlevel10k() {
     
     log "Powerlevel10k installed successfully!"
     log "Your custom configuration has been applied."
+}
+
+install_nodejs() {
+    log "Installing Node.js..."
+    
+    # Check if Node.js is already installed
+    if command -v node &> /dev/null; then
+        NODE_VERSION=$(node --version)
+        log "Node.js $NODE_VERSION is already installed"
+        return 0
+    fi
+    
+    # Install Node.js using NodeSource repository
+    log "Adding NodeSource repository..."
+    curl -fsSL https://deb.nodesource.com/setup_lts.x | sudo -E bash -
+    
+    log "Installing Node.js LTS..."
+    sudo apt-get install -y nodejs
+    
+    # Verify installation
+    if command -v node &> /dev/null && command -v npm &> /dev/null; then
+        log "Node.js installed successfully!"
+        log "Node.js version: $(node --version)"
+        log "npm version: $(npm --version)"
+    else
+        error "Node.js installation failed"
+        exit 1
+    fi
 }
 
 install_claude_code() {
@@ -424,6 +458,9 @@ main() {
     
     # Install Powerlevel10k
     install_powerlevel10k
+    
+    # Install Node.js
+    install_nodejs
     
     # Install Claude Code
     install_claude_code
