@@ -29,10 +29,15 @@ check_command() {
 install_go() {
     log "Installing Go..."
     
-    # Check if Go is already installed
-    if command -v go &> /dev/null; then
-        GO_VERSION=$(go version | awk '{print $3}' | sed 's/go//')
-        log "Go $GO_VERSION is already installed"
+    # Check if Go is already installed (check both PATH and common locations)
+    if command -v go &> /dev/null || [[ -f "/usr/local/go/bin/go" ]]; then
+        if command -v go &> /dev/null; then
+            GO_VERSION=$(go version | awk '{print $3}' | sed 's/go//')
+            log "Go $GO_VERSION is already installed and in PATH"
+        else
+            GO_VERSION=$(/usr/local/go/bin/go version | awk '{print $3}' | sed 's/go//')
+            log "Go $GO_VERSION is already installed at /usr/local/go"
+        fi
         return 0
     fi
     
@@ -52,11 +57,28 @@ install_go() {
     cd /tmp
     curl -LO "https://go.dev/dl/$GO_TARBALL"
     
+    # Check if download was successful
+    if [[ ! -f "$GO_TARBALL" ]]; then
+        error "Failed to download Go $GO_VERSION"
+        exit 1
+    fi
+    
+    # Verify the download is a valid gzip file
+    if ! gzip -t "$GO_TARBALL" 2>/dev/null; then
+        error "Downloaded file is not a valid gzip archive"
+        rm -f "$GO_TARBALL"
+        exit 1
+    fi
+    
     # Remove existing Go installation if it exists
     sudo rm -rf /usr/local/go
     
     # Extract and install Go
-    sudo tar -C /usr/local -xzf "$GO_TARBALL"
+    if ! sudo tar -C /usr/local -xzf "$GO_TARBALL"; then
+        error "Failed to extract Go archive"
+        rm -f "$GO_TARBALL"
+        exit 1
+    fi
     
     # Add Go to PATH
     SHELL_CONFIG=""
@@ -85,8 +107,14 @@ install_go() {
     # Clean up
     rm -f "/tmp/$GO_TARBALL"
     
-    log "Go installed successfully!"
-    log "Go version: $(go version)"
+    # Verify installation
+    if [[ -f "/usr/local/go/bin/go" ]]; then
+        log "Go installed successfully!"
+        log "Go version: $(/usr/local/go/bin/go version)"
+    else
+        error "Go installation failed - binary not found"
+        exit 1
+    fi
 }
 
 setup_aliases() {
@@ -153,8 +181,8 @@ install_neovim_nightly() {
     # Determine architecture
     ARCH=$(uname -m)
     case $ARCH in
-        x86_64) NVIM_ARCH="linux64" ;;
-        aarch64) NVIM_ARCH="linux64" ;;
+        x86_64) NVIM_ARCH="linux-x86_64" ;;
+        aarch64) NVIM_ARCH="linux-arm64" ;;
         *) error "Unsupported architecture: $ARCH"; exit 1 ;;
     esac
     
