@@ -186,7 +186,9 @@ install_jump() {
         if ! grep -q "jump shell" "$SHELL_CONFIG"; then
             echo "" >> "$SHELL_CONFIG"
             echo "# Jump directory navigator" >> "$SHELL_CONFIG"
-            echo 'eval "$(jump shell)"' >> "$SHELL_CONFIG"
+            echo 'if command -v jump &> /dev/null; then' >> "$SHELL_CONFIG"
+            echo '    eval "$(jump shell)"' >> "$SHELL_CONFIG"
+            echo 'fi' >> "$SHELL_CONFIG"
             log "Added jump configuration to $SHELL_CONFIG"
         fi
     fi
