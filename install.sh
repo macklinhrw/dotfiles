@@ -175,6 +175,14 @@ install_jump() {
     fi
     
     if [[ -n "$SHELL_CONFIG" ]]; then
+        # Ensure GOPATH/bin is in PATH for jump to work
+        if ! grep -q "GOPATH/bin" "$SHELL_CONFIG"; then
+            echo "" >> "$SHELL_CONFIG"
+            echo "# Go binary path" >> "$SHELL_CONFIG"
+            echo 'export PATH=$PATH:$HOME/go/bin' >> "$SHELL_CONFIG"
+            log "Added Go binary path to $SHELL_CONFIG"
+        fi
+        
         if ! grep -q "jump shell" "$SHELL_CONFIG"; then
             echo "" >> "$SHELL_CONFIG"
             echo "# Jump directory navigator" >> "$SHELL_CONFIG"
